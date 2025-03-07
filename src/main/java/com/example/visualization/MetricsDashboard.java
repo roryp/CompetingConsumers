@@ -38,6 +38,8 @@ public class MetricsDashboard {
     private JFreeChart consumerComparisonChart;
     private JFreeChart processorComparisonChart;
     private JFreeChart circuitBreakerStateChart;
+    private JFreeChart messageTypeChart;
+    private JFreeChart messageWaitTimeChart;
     
     // Datasets
     private final TimeSeries queueSizeSeries;
@@ -46,6 +48,8 @@ public class MetricsDashboard {
     private final DefaultCategoryDataset consumerDataset;
     private final DefaultCategoryDataset processorDataset;
     private final DefaultCategoryDataset circuitBreakerDataset;
+    private final DefaultCategoryDataset messageTypeDataset;
+    private final TimeSeries messageWaitTimeSeries;
     
     // Dashboard update thread
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -63,12 +67,14 @@ public class MetricsDashboard {
         this.consumerDataset = new DefaultCategoryDataset();
         this.processorDataset = new DefaultCategoryDataset();
         this.circuitBreakerDataset = new DefaultCategoryDataset();
+        this.messageTypeDataset = new DefaultCategoryDataset();
+        this.messageWaitTimeSeries = new TimeSeries("Message Wait Time");
         
         // Create UI
         frame = new JFrame("Competing Consumer Pattern Metrics Dashboard");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(1200, 800);
-        frame.setLayout(new GridLayout(3, 2));
+        frame.setLayout(new GridLayout(4, 2));
         
         // Initialize charts
         initializeCharts();
@@ -79,6 +85,8 @@ public class MetricsDashboard {
         frame.add(createChartPanel(consumerComparisonChart));
         frame.add(createChartPanel(processorComparisonChart));
         frame.add(createChartPanel(circuitBreakerStateChart));
+        frame.add(createChartPanel(messageTypeChart));
+        frame.add(createChartPanel(messageWaitTimeChart));
         
         // Add control panel
         frame.add(createControlPanel());
@@ -154,6 +162,31 @@ public class MetricsDashboard {
             false
         );
         
+        // Message type chart
+        messageTypeChart = ChartFactory.createBarChart(
+            "Message Types Processed",
+            "Message Type",
+            "Count",
+            messageTypeDataset,
+            PlotOrientation.VERTICAL,
+            true,
+            true,
+            false
+        );
+        
+        // Message wait time chart
+        TimeSeriesCollection waitTimeDataset = new TimeSeriesCollection();
+        waitTimeDataset.addSeries(messageWaitTimeSeries);
+        messageWaitTimeChart = ChartFactory.createTimeSeriesChart(
+            "Message Wait Time",
+            "Time",
+            "Wait Time (ms)",
+            waitTimeDataset,
+            true,
+            true,
+            false
+        );
+        
         // Customize charts
         customizeCharts();
     }
@@ -183,6 +216,16 @@ public class MetricsDashboard {
         circuitPlot.setBackgroundPaint(Color.WHITE);
         NumberAxis rangeAxis = (NumberAxis) circuitPlot.getRangeAxis();
         rangeAxis.setVisible(false); // Hide the numeric axis as we're just showing states
+        
+        // Customize message type chart
+        CategoryPlot messageTypePlot = messageTypeChart.getCategoryPlot();
+        messageTypePlot.setBackgroundPaint(Color.WHITE);
+        BarRenderer messageTypeRenderer = (BarRenderer) messageTypePlot.getRenderer();
+        messageTypeRenderer.setSeriesPaint(0, new Color(79, 129, 189)); // Blue bars for high-priority
+        messageTypeRenderer.setSeriesPaint(1, new Color(155, 187, 89)); // Green bars for standard
+        
+        // Customize message wait time chart
+        messageWaitTimeChart.getPlot().setBackgroundPaint(Color.WHITE);
     }
     
     private ChartPanel createChartPanel(JFreeChart chart) {
@@ -252,6 +295,8 @@ public class MetricsDashboard {
                 updateConsumerComparisonChart();
                 updateProcessorComparisonChart();
                 updateCircuitBreakerStateChart();
+                updateMessageTypeChart();
+                updateMessageWaitTimeChart();
             });
         } catch (Exception e) {
             logger.error("Error updating charts", e);
@@ -310,6 +355,23 @@ public class MetricsDashboard {
             };
             circuitBreakerDataset.addValue(stateValue, "Circuit Breaker State", metrics.name());
         }
+    }
+    
+    private void updateMessageTypeChart() {
+        messageTypeDataset.clear();
+        
+        // Get message type counts from processors
+        for (MessageProcessor processor : processors) {
+            MessageProcessor.ProcessorMetrics metrics = processor.getMetrics();
+            messageTypeDataset.addValue(metrics.highPriorityMessagesProcessed(), "High-Priority", processor.getMetrics().name());
+            messageTypeDataset.addValue(metrics.standardMessagesProcessed(), "Standard", processor.getMetrics().name());
+        }
+    }
+    
+    private void updateMessageWaitTimeChart() {
+        MessageQueue.MessageQueueMetrics metrics = messageQueue.getMetrics();
+        Millisecond now = new Millisecond();
+        messageWaitTimeSeries.addOrUpdate(now, metrics.averageWaitTimeMs());
     }
     
     public void shutdown() {
