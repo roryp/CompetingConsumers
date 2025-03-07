@@ -361,8 +361,9 @@ public class MetricsDashboard {
         // Get message type counts from processors
         for (MessageProcessor processor : processors) {
             MessageProcessor.ProcessorMetrics metrics = processor.getMetrics();
-            messageTypeDataset.addValue(metrics.highPriorityMessagesProcessed(), "High-Priority", processor.getMetrics().name());
-            messageTypeDataset.addValue(metrics.standardMessagesProcessed(), "Standard", processor.getMetrics().name());
+            String processorName = metrics.name();
+            messageTypeDataset.addValue(metrics.highPriorityMessagesProcessed(), "High-Priority", processorName);
+            messageTypeDataset.addValue(metrics.standardMessagesProcessed(), "Standard", processorName);
         }
     }
     
