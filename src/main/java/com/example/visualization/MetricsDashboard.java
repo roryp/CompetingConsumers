@@ -20,9 +20,7 @@ import org.slf4j.LoggerFactory;
 import javax.swing.*;
 import java.awt.*;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;
 
 public class MetricsDashboard {
     private static final Logger logger = LoggerFactory.getLogger(MetricsDashboard.class);
