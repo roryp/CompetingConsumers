@@ -33,7 +33,10 @@ public class MessageQueue {
     private final MeterRegistry registry = new SimpleMeterRegistry();
     private final Counter messagesReceived = registry.counter("messages.received");
     private final Counter messagesProcessed = registry.counter("messages.processed");
+    private final Counter highPriorityMessagesProcessed = registry.counter("messages.processed.high_priority");
+    private final Counter standardMessagesProcessed = registry.counter("messages.processed.standard");
     private final Timer messageProcessingTime = registry.timer("message.processing.time");
+    private final Timer messageWaitTime = registry.timer("message.wait.time");
     
     // Concurrency control
     private final ReentrantLock lock = new ReentrantLock();
@@ -64,6 +67,11 @@ public class MessageQueue {
     public Message getMessage() throws InterruptedException {
         Message message = queue.take();
         messagesProcessed.increment();
+        if (message.getType() == Message.MessageType.PRIORITY) {
+            highPriorityMessagesProcessed.increment();
+        } else if (message.getType() == Message.MessageType.STANDARD) {
+            standardMessagesProcessed.increment();
+        }
         messageCount.decrementAndGet();
         return message;
     }
@@ -75,6 +83,11 @@ public class MessageQueue {
         Message message = queue.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
         if (message != null) {
             messagesProcessed.increment();
+            if (message.getType() == Message.MessageType.PRIORITY) {
+                highPriorityMessagesProcessed.increment();
+            } else if (message.getType() == Message.MessageType.STANDARD) {
+                standardMessagesProcessed.increment();
+            }
             messageCount.decrementAndGet();
         }
         return message;
@@ -94,8 +107,11 @@ public class MessageQueue {
         return new MessageQueueMetrics(
             messagesReceived.count(),
             messagesProcessed.count(),
+            highPriorityMessagesProcessed.count(),
+            standardMessagesProcessed.count(),
             messageCount.get(),
-            messageProcessingTime.mean(TimeUnit.MILLISECONDS)
+            messageProcessingTime.mean(TimeUnit.MILLISECONDS),
+            messageWaitTime.mean(TimeUnit.MILLISECONDS)
         );
     }
     
@@ -119,7 +135,10 @@ public class MessageQueue {
     public record MessageQueueMetrics(
         double messagesReceived,
         double messagesProcessed,
+        double highPriorityMessagesProcessed,
+        double standardMessagesProcessed,
         long currentQueueSize,
-        double averageProcessingTimeMs
+        double averageProcessingTimeMs,
+        double averageWaitTimeMs
     ) {}
 }

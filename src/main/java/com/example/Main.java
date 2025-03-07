@@ -10,6 +10,10 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.example.visualization.MetricsDashboard;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Timer;
 
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
@@ -214,6 +218,7 @@ public class Main {
         logger.info("Messages processed: {}", metrics.messagesProcessed());
         logger.info("Current queue size: {}", metrics.currentQueueSize());
         logger.info("Avg processing time: {} ms", metrics.averageProcessingTimeMs());
+        logger.info("Avg wait time: {} ms", metrics.averageWaitTimeMs());
         logger.info("---------------------------------");
     }
     
@@ -228,8 +233,11 @@ public class Main {
                 metrics.name(), metrics.currentBatchSize());
             logger.info("  Messages processed: {}", metrics.messagesProcessed());
             logger.info("  Messages failed: {}", metrics.messagesFailed());
+            logger.info("  High-priority messages processed: {}", metrics.highPriorityMessagesProcessed());
+            logger.info("  Standard messages processed: {}", metrics.standardMessagesProcessed());
             logger.info("  Avg processing time: {} ms", metrics.avgProcessingTimeMs());
             logger.info("  Avg batch time: {} ms", metrics.avgBatchTimeMs());
+            logger.info("  Avg wait time: {} ms", metrics.avgWaitTimeMs());
             logger.info("  Circuit breaker state: {}", metrics.circuitBreakerState());
             logger.info("---------------------------------");
         }
@@ -245,6 +253,30 @@ public class Main {
                 "Shutdown signal", 
                 Message.MessageType.POISON
             ));
+        }
+    }
+    
+    /**
+     * Set up real-time alerts based on collected metrics
+     */
+    private static void setupRealTimeAlerts(MeterRegistry registry) {
+        Counter highPriorityMessagesProcessed = registry.counter("messages.processed.high_priority");
+        Counter standardMessagesProcessed = registry.counter("messages.processed.standard");
+        Timer messageWaitTime = registry.timer("message.wait.time");
+
+        // Example alert: High-priority messages processed exceeds threshold
+        if (highPriorityMessagesProcessed.count() > 100) {
+            logger.warn("High-priority messages processed exceeded threshold: {}", highPriorityMessagesProcessed.count());
+        }
+
+        // Example alert: Standard messages processed exceeds threshold
+        if (standardMessagesProcessed.count() > 500) {
+            logger.warn("Standard messages processed exceeded threshold: {}", standardMessagesProcessed.count());
+        }
+
+        // Example alert: Message wait time exceeds threshold
+        if (messageWaitTime.mean(TimeUnit.MILLISECONDS) > 200) {
+            logger.warn("Average message wait time exceeded threshold: {} ms", messageWaitTime.mean(TimeUnit.MILLISECONDS));
         }
     }
 }

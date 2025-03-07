@@ -48,8 +48,11 @@ public class MessageProcessor {
     private final MeterRegistry registry = new SimpleMeterRegistry();
     private final Counter messagesProcessed;
     private final Counter messagesFailed;
+    private final Counter highPriorityMessagesProcessed;
+    private final Counter standardMessagesProcessed;
     private final Timer processingTimer;
     private final Timer batchProcessingTimer;
+    private final Timer messageWaitTime;
     
     // Control flags
     private volatile boolean running = true;
@@ -68,8 +71,11 @@ public class MessageProcessor {
         // Setup metrics
         this.messagesProcessed = registry.counter("processor." + this.name + ".processed");
         this.messagesFailed = registry.counter("processor." + this.name + ".failed");
+        this.highPriorityMessagesProcessed = registry.counter("processor." + this.name + ".processed.high_priority");
+        this.standardMessagesProcessed = registry.counter("processor." + this.name + ".processed.standard");
         this.processingTimer = registry.timer("processor." + this.name + ".processing.time");
         this.batchProcessingTimer = registry.timer("processor." + this.name + ".batch.time");
+        this.messageWaitTime = registry.timer("processor." + this.name + ".wait.time");
         
         // Configure circuit breaker for fault tolerance
         CircuitBreakerConfig circuitBreakerConfig = CircuitBreakerConfig.custom()
@@ -308,8 +314,14 @@ public class MessageProcessor {
             
             // Use pattern matching to handle different message types
             String result = switch (message) {
-                case Message.Priority p -> "Priority message consumed: " + p.getContent();
-                case Message.Standard s -> "Standard message consumed: " + s.getContent();
+                case Message.Priority p -> {
+                    highPriorityMessagesProcessed.increment();
+                    yield "Priority message consumed: " + p.getContent();
+                }
+                case Message.Standard s -> {
+                    standardMessagesProcessed.increment();
+                    yield "Standard message consumed: " + s.getContent();
+                }
                 case Message.Poison p -> "Poison message detected: " + p.getContent();
             };
             
@@ -326,8 +338,11 @@ public class MessageProcessor {
             name,
             messagesProcessed.count(),
             messagesFailed.count(),
+            highPriorityMessagesProcessed.count(),
+            standardMessagesProcessed.count(),
             processingTimer.mean(TimeUnit.MILLISECONDS),
             batchProcessingTimer.mean(TimeUnit.MILLISECONDS),
+            messageWaitTime.mean(TimeUnit.MILLISECONDS),
             calculateAdaptiveBatchSize(),
             circuitBreaker.getState().name()
         );
@@ -347,8 +362,11 @@ public class MessageProcessor {
         String name,
         double messagesProcessed,
         double messagesFailed,
+        double highPriorityMessagesProcessed,
+        double standardMessagesProcessed,
         double avgProcessingTimeMs,
         double avgBatchTimeMs,
+        double avgWaitTimeMs,
         int currentBatchSize,
         String circuitBreakerState
     ) {}
