@@ -11,7 +11,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.example.visualization.MetricsDashboard;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Timer;
 
@@ -203,7 +202,7 @@ public class Main {
             }
             
             // Ensure the dashboard is properly shut down at the end
-            dashboard.shutdown();
+            //dashboard.shutdown();
             logger.info("Demo completed");
         }
     }
